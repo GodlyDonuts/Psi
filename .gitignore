@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# Native build artifacts (C / CUDA / Metal kernels)
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.a
+*.metallib
+build/
+dist/
+cmake-build-*/
+
+# ML artifacts — never commit weights, datasets, or logs
+*.bin
+*.pt
+*.safetensors
+*.gguf
+checkpoints/
+data/
+datasets/
+runs/
+wandb/
+*.log
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
