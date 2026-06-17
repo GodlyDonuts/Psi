@@ -33,5 +33,11 @@ trustworthy; the relative speedups in the table were same-session and stand.
 **Status:** the simple vectorized matmul is at the practical CPU double-precision roofline (~22–26
 GFLOP/s on 4 cores) — further matmul micro-opt shows diminishing/negative returns. Remaining clean CPU
 wins live in **per-op overhead** (arena/tape autograd for psi-nano's many small ops) and a **persistent
-thread pool**; the real 10–100× is **Step 3 — Metal GPU kernels** (best done with the user awake). Next
-iteration targets the arena/tape autograd.
+thread pool**; the real 10–100× is **Step 3 — Metal GPU kernels** (best done with the user awake).
+
+**Iter 5 — `-ffast-math` on the training build (psi-nano only): ~2.0× win, KEPT.** Same-session A/B
+(200 steps): 3.6s/3.5s → 1.8s/1.7s with **identical loss (1.8250)** — convergence unchanged, no NaN.
+The grad-check oracle stays strict `double` (no fast-math), so the math remains proven; fast-math only
+relaxes FP reassociation/contraction on the training path, which is safe here (causal mask is −1e9 not
+−Inf, softmax is max-subtracted, CE is guarded). Next: arena/tape autograd, or batch the projection
+matmuls so they cross the threading threshold.
