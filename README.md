@@ -34,7 +34,8 @@ class — since a solo builder can't out-token the labs.
 Research-first: landscape sweep → design doc → build.
 
 - [x] Project charter & goals — see [docs/00-charter.md](docs/00-charter.md)
-- [ ] Design doc (`docs/DESIGN.md`) — in progress, research-backed
-- [ ] Decide target capability (general Pareto vs domain specialist vs reasoning-focused)
+- [x] Design doc — see [docs/DESIGN.md](docs/DESIGN.md)
+- [ ] Decide target capability — *recommended:* reasoning/math specialist, made tiny via
+  distillation + a ternary (≈1.58-bit) track (see DESIGN §2). Your call.
 - [ ] Custom stack: scalar autograd → tensor autograd → naive GPT loop → fused kernels → multi-device
 - [ ] First trained model + eval against size-matched baselines
