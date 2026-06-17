@@ -37,5 +37,21 @@ Research-first: landscape sweep → design doc → build.
 - [x] Design doc — see [docs/DESIGN.md](docs/DESIGN.md)
 - [ ] Decide target capability — *recommended:* reasoning/math specialist, made tiny via
   distillation + a ternary (≈1.58-bit) track (see DESIGN §2). Your call.
-- [ ] Custom stack: scalar autograd → tensor autograd → naive GPT loop → fused kernels → multi-device
+- [~] Custom stack — **scalar autograd ✅ (Step 0, C++)** → tensor autograd → naive GPT loop → fused kernels → multi-device
 - [ ] First trained model + eval against size-matched baselines
+
+## Build
+
+Language: **C++17** (host + autograd + kernel dispatch). Compute kernels will be Metal
+(Apple Silicon) and CUDA (Hopper/GH200) — same C++ family, no FFI boundary. See
+[docs/DESIGN.md](docs/DESIGN.md) §8.
+
+**Step 0** — scalar reverse-mode autograd + XOR MLP + finite-difference gradient check:
+
+```sh
+# direct (no extra tooling needed):
+clang++ -std=c++17 -O2 src/step0_scalar_autograd/main.cpp -o step0 && ./step0
+
+# or via CMake (brew install cmake):
+cmake -B build && cmake --build build && ./build/step0
+```
