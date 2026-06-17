@@ -69,8 +69,10 @@ clang++ -std=c++17 -O2 src/step1_tensor_autograd/main.cpp -o step1 && ./step1
 ```sh
 # transformer-op grad checks (all PASS):
 clang++ -std=c++17 -O2 src/step2_psi_nano/gradcheck.cpp -o step2_gradcheck && ./step2_gradcheck
-# train psi-nano on a small corpus (CPU, a few minutes) and sample text:
-clang++ -std=c++17 -O2 src/step2_psi_nano/main.cpp -o psi_nano && ./psi_nano   # optional: ./psi_nano <steps>
+# train psi-nano (~20s with the fast flags) then sample — or chat with it interactively:
+clang++ -std=c++17 -O3 -march=native -ffast-math -DPSI_REAL=float src/step2_psi_nano/main.cpp -o psi_nano
+./psi_nano        # train + print samples   (optional: ./psi_nano <steps>)
+./psi_nano chat   # train, then prompt it live (lowercase a-z, space, '.')
 ```
 
 _Result (MacBook CPU, ~3 min / 2500 steps): cross-entropy loss `ln(27) ≈ 3.30 → ~0.16`; generated

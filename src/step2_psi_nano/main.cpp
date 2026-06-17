@@ -10,6 +10,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <iostream>
 #include <random>
 #include <string>
 #include <unordered_map>
@@ -32,7 +33,14 @@ static const std::string CORPUS =
     "still clever wins. one character at a time, the model learns the shape of language. ";
 
 int main(int argc, char** argv) {
-    int steps = (argc > 1) ? std::atoi(argv[1]) : 2000;
+    // args: a number sets training steps; "chat" enters an interactive prompt after training.
+    bool chat = false;
+    int steps = 2000;
+    for (int i = 1; i < argc; ++i) {
+        std::string a = argv[i];
+        if (a == "chat" || a == "--chat") chat = true;
+        else steps = std::atoi(argv[i]);
+    }
 
     // ---- tokenizer: char-level ----
     std::vector<char> id2ch;
@@ -96,6 +104,21 @@ int main(int argc, char** argv) {
     for (int k = 0; k < 3; ++k) {
         std::string s = generate(model, seed, 160, 0.7, rng, id2ch);
         std::printf("  \"the %s\"\n", s.c_str());
+    }
+
+    if (chat) {
+        std::printf("\n[interactive] type a lowercase seed (a-z, space, '.'); 'quit' to exit.\n> ");
+        std::fflush(stdout);
+        std::string line;
+        while (std::getline(std::cin, line)) {
+            if (line == "quit" || line == "exit") break;
+            std::vector<int> ctx;                       // keep only in-vocab chars
+            for (char c : line) if (ch2id.count(c)) ctx.push_back(ch2id[c]);
+            if (ctx.empty()) ctx.push_back(ch2id[' ']);
+            std::string s = generate(model, ctx, 200, 0.7, rng, id2ch);
+            std::printf("%s%s\n> ", line.c_str(), s.c_str());
+            std::fflush(stdout);
+        }
     }
     return 0;
 }
