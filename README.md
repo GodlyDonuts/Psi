@@ -36,9 +36,10 @@ Research-first: landscape sweep → design doc → build.
 - [x] Project charter & goals — see [docs/00-charter.md](docs/00-charter.md)
 - [x] Design doc — see [docs/DESIGN.md](docs/DESIGN.md)
 - [x] Radicalism map — radical in every layer, unified by capability-per-bit: see [docs/RADICAL.md](docs/RADICAL.md)
+- [x] Quality bar — definition-of-done per component: see [docs/QUALITY.md](docs/QUALITY.md)
 - [ ] Decide target capability — *recommended:* reasoning/math specialist, made tiny via
   distillation + a ternary (≈1.58-bit) track (see DESIGN §2). Your call.
-- [~] Custom stack — scalar ✅ (Step 0) · **tensor autograd ✅ (Step 1)** → naive GPT loop → fused kernels → multi-device
+- [~] Custom stack — scalar ✅ (Step 0) · tensor autograd ✅ (Step 1) · **psi-nano GPT ✅ (Step 2)** → fused kernels → multi-device
 - [ ] First trained model + eval against size-matched baselines
 
 ## Build
@@ -61,4 +62,13 @@ cmake -B build && cmake --build build && ./build/step0
 
 ```sh
 clang++ -std=c++17 -O2 src/step1_tensor_autograd/main.cpp -o step1 && ./step1
+```
+
+**Step 2** — psi-nano: a tiny char-level GPT trained end-to-end on the custom stack:
+
+```sh
+# transformer-op grad checks (all PASS):
+clang++ -std=c++17 -O2 src/step2_psi_nano/gradcheck.cpp -o step2_gradcheck && ./step2_gradcheck
+# train psi-nano on a small corpus (CPU, a few minutes) and sample text:
+clang++ -std=c++17 -O2 src/step2_psi_nano/main.cpp -o psi_nano && ./psi_nano   # optional: ./psi_nano <steps>
 ```
