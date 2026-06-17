@@ -35,6 +35,7 @@ Research-first: landscape sweep → design doc → build.
 
 - [x] Project charter & goals — see [docs/00-charter.md](docs/00-charter.md)
 - [x] Design doc — see [docs/DESIGN.md](docs/DESIGN.md)
+- [x] Radicalism map — radical in every layer, unified by capability-per-bit: see [docs/RADICAL.md](docs/RADICAL.md)
 - [ ] Decide target capability — *recommended:* reasoning/math specialist, made tiny via
   distillation + a ternary (≈1.58-bit) track (see DESIGN §2). Your call.
 - [~] Custom stack — **scalar autograd ✅ (Step 0, C++)** → tensor autograd → naive GPT loop → fused kernels → multi-device
