@@ -26,3 +26,6 @@ target_compile_options(psi_nano PRIVATE -ffast-math)              # ~2x; grad-ch
 
 # Benchmarks — the optimization scoreboard.
 add_executable(matmul_bench src/bench/matmul_bench.cpp)
+add_executable(psi_profile  src/bench/psi_profile.cpp)             # phase breakdown of a training step
+target_compile_definitions(psi_profile PRIVATE PSI_REAL=float)
+target_compile_options(psi_profile PRIVATE -ffast-math)

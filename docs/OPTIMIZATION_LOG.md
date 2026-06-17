@@ -52,3 +52,13 @@ matmul micro-opt (iter 4) move its step time, while `-ffast-math` (iter 5) did. 
 is **per-op / scalar overhead** (node allocation, graph build, the many small elementwise loops), not
 GEMM. Next: profile to confirm, then **arena/tape autograd** to cut per-op allocation. The big leap
 remains **Step 3 — Metal GPU kernels** (with the user).
+
+**Iter 7 — profiling (added `psi_profile`; no engine change).** Phase breakdown of a psi-nano step
+(8.6 ms/step): **forward+loss 39%, backward 61%, optimizer ~0%.** Confirms the diagnostic — the
+optimizer (pure array math) is free; the cost is evaluating **~2000 tiny ops/step** (forward
+node-build + compute, backward closure dispatch + grad loops). The matmuls are too small to be
+throughput-bound, which is why iters 4 & 6 didn't move the needle. **No single micro-opt fixes this**
+— the structural win is fewer/fused ops or a **tape/arena autograd** (build the graph once, replay it
+each step), a deliberate core-autograd refactor best done carefully (with the user). The clean,
+safe CPU quick-wins are now **exhausted**; the order-of-magnitude leap from here is **Step 3 — Metal
+GPU kernels**.
