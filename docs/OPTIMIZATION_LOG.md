@@ -62,3 +62,24 @@ throughput-bound, which is why iters 4 & 6 didn't move the needle. **No single m
 each step), a deliberate core-autograd refactor best done carefully (with the user). The clean,
 safe CPU quick-wins are now **exhausted**; the order-of-magnitude leap from here is **Step 3 — Metal
 GPU kernels**.
+
+**Iter 8 — inline `parents` (vector → fixed `[2]`) to cut a per-node allocation: NEUTRAL, REVERTED.**
+Same-session profiler A/B (3 runs each): 8.3 ms/step → 8.3 ms/step, no change. Grad-checks passed.
+**Key finding:** removing a per-node heap allocation changed *nothing* — so the overhead is **not
+allocation**, it's **op-dispatch** (~2000 `std::function` backward calls + tiny-loop compute per step).
+
+---
+
+## Loop summary (paused)
+
+Eight iterations: matmul **1.8 → ~22 GFLOP/s** (i-l-j reorder + `-O3 -march=native` + multithreading)
+and psi-nano **~10×** (float32 + `-ffast-math`), plus **3 honest reverts** (register-blocking regressed;
+batched-matmul correct-but-neutral; parents-inline neutral) and a profiler. Every change was
+same-session-measured and grad-check-gated; correctness never traded for speed.
+
+**The clean, safe CPU quick-wins are exhausted** (iters 4, 6, 8 confirm: the bottleneck is op-dispatch,
+not GEMM or allocation). The remaining real speedups are all *structural*: a **tape autograd** (replace
+`std::function` dispatch with a typed op tape), **batch-parallel gradient accumulation**, or — the real
+order-of-magnitude — **Step 3, the custom Metal GPU kernels.** The kernels are the project's deliberate
+centerpiece (RADICAL.md: master + novelty), to be built *with* the user, not autonomously overnight.
+**Loop paused pending direction.**
