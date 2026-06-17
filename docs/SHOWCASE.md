@@ -59,8 +59,10 @@ This generalization is itself showcase-worthy — it's the line between "a scrip
 
 1. **Framework-ize `psi-nano`** — config, tokenizer abstraction, data pipeline, checkpoints.
    *(CPU-doable now; also fixes the hardcoded corpus + no-save-load limitations.)*
-2. **GPU kernels** — Metal (Mac) / CUDA (GH200). The project centerpiece **and** the unlock: CPU
-   (~22 GFLOP/s) would take weeks per model; the GPU makes each a few hours.
+2. **GPU kernels** ✅ — Metal matmul tuned to **parity-class with MLX** (bit-exact; 99% of MLX on the
+   key shape) **plus a novel ternary-weight GEMM** (16× smaller weights at full fp32-GEMM speed — the
+   capability-per-bit flag, which MLX has no path for). Full journey + findings:
+   [GPU_KERNELS.md](GPU_KERNELS.md). *Next: wire ternary into the autograd backend.*
 3. **Flagship `psi-stories`** — prove it's genuinely good (held-out loss + novel samples).
 4. **Fan out** — `psi-chess` + a quick third.
 5. **Demo + writeup** — a web page where people pick a model and try it (full-stack skills tie the
@@ -70,5 +72,6 @@ This generalization is itself showcase-worthy — it's the line between "a scrip
 
 - The **kernels gate** anything beyond toy scale.
 - **Multi-week** effort; quality-per-model is non-negotiable.
-- Eventually the **ternary track** ([RADICAL.md](RADICAL.md)) makes a zoo model "the smallest in MB
-  that writes/plays X" — the capability-per-bit flag.
+- The **ternary track** ([RADICAL.md](RADICAL.md)) makes a zoo model "the smallest in MB that
+  writes/plays X" — the capability-per-bit flag. The enabling kernel **already exists** (the ternary
+  GEMM, [GPU_KERNELS.md](GPU_KERNELS.md)); a `psi-stories-ternary` is the natural headline demo.
