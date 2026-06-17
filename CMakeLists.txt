@@ -13,3 +13,6 @@ add_compile_options(-O2 -Wall -Wextra)
 
 # Step 0 — scalar reverse-mode autograd + XOR MLP + finite-difference grad check.
 add_executable(step0 src/step0_scalar_autograd/main.cpp)
+
+# Step 1 — tensor autograd (CPU oracle): core ops, grad checks, tensor XOR.
+add_executable(step1 src/step1_tensor_autograd/main.cpp)

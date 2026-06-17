@@ -1,0 +1,232 @@
+// tensor.hpp — tensor-level reverse-mode autograd (CPU reference oracle).
+//
+// Step 1 of the Psi stack. Same algorithm as Step 0 (record a local backward per op,
+// then walk the graph in reverse), but the *unit* is now an N-D array instead of a
+// scalar. That single change is what makes a real model trainable: one `matmul` node
+// stands in for millions of scalar multiply-adds, so the per-node bookkeeping
+// (allocation, pointer-chasing) is amortized to nothing, and the numbers live in
+// contiguous buffers that vectorize.
+//
+// Deliberate non-goals here (correct-first, per RADICAL.md):
+//   * We keep the shared_ptr node + std::function closure design from Step 0. At tensor
+//     granularity the node count is tiny (a handful per layer), so the allocation/
+//     refcount overhead that mattered for scalars is now negligible. The arena/tape/
+//     index optimization is therefore DEFERRED until a profile says otherwise — and the
+//     real cost will move into the kernels (Step 3), not the graph plumbing.
+//   * Data type is `double` so this stays a high-precision correctness oracle we can
+//     trust the tensor engine against. Low precision (bf16/fp8/ternary) is a kernel-layer
+//     concern later, not the reference's job.
+
+#pragma once
+
+#include <algorithm>
+#include <cassert>
+#include <cmath>
+#include <functional>
+#include <memory>
+#include <random>
+#include <unordered_set>
+#include <vector>
+
+namespace psi {
+
+using real = double;  // reference-oracle precision; kernels go low-bit later.
+
+struct TensorNode {
+    std::vector<int>  shape;                              // row-major
+    std::vector<real> data;                              // values
+    std::vector<real> grad;                              // d(loss)/d(this), same size
+    std::vector<std::shared_ptr<TensorNode>> parents;    // inputs that produced this
+    std::function<void()> backward_fn;                   // local chain rule
+    const char* op = "";
+
+    explicit TensorNode(std::vector<int> shp) : shape(std::move(shp)) {
+        int n = numel();
+        data.assign(n, real(0));
+        grad.assign(n, real(0));
+    }
+    int numel() const {
+        int p = 1;
+        for (int s : shape) p *= s;
+        return p;
+    }
+};
+
+using NodePtr = std::shared_ptr<TensorNode>;
+
+class Tensor {
+public:
+    NodePtr node;
+
+    Tensor() = default;
+    explicit Tensor(std::vector<int> shape)
+        : node(std::make_shared<TensorNode>(std::move(shape))) {}
+
+    static Tensor from(std::vector<real> data, std::vector<int> shape) {
+        Tensor t(std::move(shape));
+        assert((int)data.size() == t.numel());
+        t.node->data = std::move(data);
+        return t;
+    }
+    // Gaussian init with an explicit std — we pass a fan-in-scaled std at the call site
+    // (Xavier/He), the lesson from the Step-0 math review.
+    static Tensor randn(std::vector<int> shape, std::mt19937& rng, real stddev) {
+        Tensor t(std::move(shape));
+        std::normal_distribution<real> d(0.0, stddev);
+        for (auto& v : t.node->data) v = d(rng);
+        return t;
+    }
+
+    const std::vector<int>& shape() const { return node->shape; }
+    int   numel() const { return node->numel(); }
+    int   dim(int i) const { return node->shape[i]; }
+    std::vector<real>& data() const { return node->data; }
+    std::vector<real>& grad() const { return node->grad; }
+    void  zero_grad() const { std::fill(node->grad.begin(), node->grad.end(), real(0)); }
+
+    void backward() const;
+};
+
+// Build an output tensor with its op label and parents wired up.
+inline Tensor make_out(std::vector<int> shape, const char* op, std::vector<NodePtr> parents) {
+    Tensor t(std::move(shape));
+    t.node->op = op;
+    t.node->parents = std::move(parents);
+    return t;
+}
+
+// ---------------------------------------------------------------------------
+// Ops. Each computes the forward, then records the local backward.
+// ---------------------------------------------------------------------------
+
+// C[m,n] = A[m,k] @ B[k,n].  dA = dC @ B^T,  dB = A^T @ dC.
+inline Tensor matmul(const Tensor& A, const Tensor& B) {
+    assert(A.shape().size() == 2 && B.shape().size() == 2);
+    int m = A.dim(0), k = A.dim(1), n = B.dim(1);
+    assert(B.dim(0) == k);
+    Tensor out = make_out({m, n}, "matmul", {A.node, B.node});
+    const auto& a = A.data(); const auto& b = B.data(); auto& c = out.data();
+    for (int i = 0; i < m; ++i)
+        for (int j = 0; j < n; ++j) {
+            real s = 0;
+            for (int l = 0; l < k; ++l) s += a[i * k + l] * b[l * n + j];
+            c[i * n + j] = s;
+        }
+    TensorNode *Ap = A.node.get(), *Bp = B.node.get(), *Op = out.node.get();
+    out.node->backward_fn = [Ap, Bp, Op, m, k, n] {
+        const auto& dc = Op->grad; const auto& a = Ap->data; const auto& b = Bp->data;
+        auto& da = Ap->grad; auto& db = Bp->grad;
+        for (int i = 0; i < m; ++i)                  // dA = dC @ B^T
+            for (int l = 0; l < k; ++l) {
+                real s = 0;
+                for (int j = 0; j < n; ++j) s += dc[i * n + j] * b[l * n + j];
+                da[i * k + l] += s;
+            }
+        for (int l = 0; l < k; ++l)                  // dB = A^T @ dC
+            for (int j = 0; j < n; ++j) {
+                real s = 0;
+                for (int i = 0; i < m; ++i) s += a[i * k + l] * dc[i * n + j];
+                db[l * n + j] += s;
+            }
+    };
+    return out;
+}
+
+// C[m,n] = A[m,n] + bias[n]  (bias broadcast across rows).
+inline Tensor add_bias(const Tensor& A, const Tensor& bias) {
+    assert(A.shape().size() == 2 && bias.shape().size() == 1 && bias.dim(0) == A.dim(1));
+    int m = A.dim(0), n = A.dim(1);
+    Tensor out = make_out({m, n}, "add_bias", {A.node, bias.node});
+    const auto& a = A.data(); const auto& bb = bias.data(); auto& c = out.data();
+    for (int i = 0; i < m; ++i)
+        for (int j = 0; j < n; ++j) c[i * n + j] = a[i * n + j] + bb[j];
+    TensorNode *Ap = A.node.get(), *Bp = bias.node.get(), *Op = out.node.get();
+    out.node->backward_fn = [Ap, Bp, Op, m, n] {
+        for (int i = 0; i < m; ++i)
+            for (int j = 0; j < n; ++j) {
+                Ap->grad[i * n + j] += Op->grad[i * n + j];   // dA = dC
+                Bp->grad[j]         += Op->grad[i * n + j];   // dbias = sum over rows
+            }
+    };
+    return out;
+}
+
+// Elementwise (same-shape) subtract:  C = A - B.
+inline Tensor sub(const Tensor& A, const Tensor& B) {
+    assert(A.shape() == B.shape());
+    Tensor out = make_out(A.shape(), "sub", {A.node, B.node});
+    int n = A.numel();
+    for (int i = 0; i < n; ++i) out.data()[i] = A.data()[i] - B.data()[i];
+    TensorNode *Ap = A.node.get(), *Bp = B.node.get(), *Op = out.node.get();
+    out.node->backward_fn = [Ap, Bp, Op, n] {
+        for (int i = 0; i < n; ++i) { Ap->grad[i] += Op->grad[i]; Bp->grad[i] -= Op->grad[i]; }
+    };
+    return out;
+}
+
+// Elementwise (same-shape) multiply (Hadamard):  C = A * B.
+inline Tensor mul(const Tensor& A, const Tensor& B) {
+    assert(A.shape() == B.shape());
+    Tensor out = make_out(A.shape(), "mul", {A.node, B.node});
+    int n = A.numel();
+    for (int i = 0; i < n; ++i) out.data()[i] = A.data()[i] * B.data()[i];
+    TensorNode *Ap = A.node.get(), *Bp = B.node.get(), *Op = out.node.get();
+    out.node->backward_fn = [Ap, Bp, Op, n] {
+        for (int i = 0; i < n; ++i) {
+            Ap->grad[i] += Bp->data[i] * Op->grad[i];
+            Bp->grad[i] += Ap->data[i] * Op->grad[i];
+        }
+    };
+    return out;
+}
+
+inline Tensor tanh(const Tensor& A) {
+    Tensor out = make_out(A.shape(), "tanh", {A.node});
+    int n = A.numel();
+    for (int i = 0; i < n; ++i) out.data()[i] = std::tanh(A.data()[i]);
+    TensorNode *Ap = A.node.get(), *Op = out.node.get();
+    out.node->backward_fn = [Ap, Op, n] {
+        for (int i = 0; i < n; ++i) {
+            real t = Op->data[i];
+            Ap->grad[i] += (1.0 - t * t) * Op->grad[i];   // 1 - tanh^2
+        }
+    };
+    return out;
+}
+
+// Mean of all elements -> scalar [1].
+inline Tensor mean(const Tensor& A) {
+    Tensor out = make_out({1}, "mean", {A.node});
+    int n = A.numel();
+    real s = 0;
+    for (int i = 0; i < n; ++i) s += A.data()[i];
+    out.data()[0] = s / n;
+    TensorNode *Ap = A.node.get(), *Op = out.node.get();
+    out.node->backward_fn = [Ap, Op, n] {
+        real g = Op->grad[0] / n;
+        for (int i = 0; i < n; ++i) Ap->grad[i] += g;
+    };
+    return out;
+}
+
+// ---------------------------------------------------------------------------
+// Reverse-mode autodiff (identical structure to Step 0, now over tensor nodes).
+// ---------------------------------------------------------------------------
+inline void Tensor::backward() const {
+    assert(numel() == 1 && "backward() must start from a scalar");
+    std::vector<TensorNode*> topo;
+    std::unordered_set<TensorNode*> seen;
+    std::function<void(TensorNode*)> build = [&](TensorNode* v) {
+        if (seen.count(v)) return;
+        seen.insert(v);
+        for (auto& p : v->parents) build(p.get());
+        topo.push_back(v);
+    };
+    build(node.get());
+
+    node->grad[0] = 1.0;
+    for (auto it = topo.rbegin(); it != topo.rend(); ++it)
+        if ((*it)->backward_fn) (*it)->backward_fn();
+}
+
+}  // namespace psi

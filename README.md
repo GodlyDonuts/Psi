@@ -38,7 +38,7 @@ Research-first: landscape sweep → design doc → build.
 - [x] Radicalism map — radical in every layer, unified by capability-per-bit: see [docs/RADICAL.md](docs/RADICAL.md)
 - [ ] Decide target capability — *recommended:* reasoning/math specialist, made tiny via
   distillation + a ternary (≈1.58-bit) track (see DESIGN §2). Your call.
-- [~] Custom stack — **scalar autograd ✅ (Step 0, C++)** → tensor autograd → naive GPT loop → fused kernels → multi-device
+- [~] Custom stack — scalar ✅ (Step 0) · **tensor autograd ✅ (Step 1)** → naive GPT loop → fused kernels → multi-device
 - [ ] First trained model + eval against size-matched baselines
 
 ## Build
@@ -55,4 +55,10 @@ clang++ -std=c++17 -O2 src/step0_scalar_autograd/main.cpp -o step0 && ./step0
 
 # or via CMake (brew install cmake):
 cmake -B build && cmake --build build && ./build/step0
+```
+
+**Step 1** — tensor autograd (CPU oracle): core ops, per-op grad checks, tensor XOR:
+
+```sh
+clang++ -std=c++17 -O2 src/step1_tensor_autograd/main.cpp -o step1 && ./step1
 ```
