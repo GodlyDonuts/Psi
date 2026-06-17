@@ -9,7 +9,7 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-add_compile_options(-O2 -Wall -Wextra)
+add_compile_options(-O3 -march=native -Wall -Wextra)
 
 # Step 0 — scalar reverse-mode autograd + XOR MLP + finite-difference grad check.
 add_executable(step0 src/step0_scalar_autograd/main.cpp)
@@ -20,3 +20,6 @@ add_executable(step1 src/step1_tensor_autograd/main.cpp)
 # Step 2 — psi-nano: a tiny char-level GPT on the custom stack.
 add_executable(step2_gradcheck src/step2_psi_nano/gradcheck.cpp)  # transformer-op grad checks
 add_executable(psi_nano        src/step2_psi_nano/main.cpp)        # train + sample
+
+# Benchmarks — the optimization scoreboard.
+add_executable(matmul_bench src/bench/matmul_bench.cpp)

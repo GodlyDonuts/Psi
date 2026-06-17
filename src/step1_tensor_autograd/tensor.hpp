@@ -106,11 +106,15 @@ inline Tensor matmul(const Tensor& A, const Tensor& B) {
     assert(B.dim(0) == k);
     Tensor out = make_out({m, n}, "matmul", {A.node, B.node});
     const auto& a = A.data(); const auto& b = B.data(); auto& c = out.data();
+    // i-l-j order: the inner loop is contiguous in both b and c (c starts zero-filled),
+    // which is cache-friendly and auto-vectorizes — vs the naive i-j-l dot product that
+    // strides through b. Same result up to FP summation order (absorbed by grad-check tol).
     for (int i = 0; i < m; ++i)
-        for (int j = 0; j < n; ++j) {
-            real s = 0;
-            for (int l = 0; l < k; ++l) s += a[i * k + l] * b[l * n + j];
-            c[i * n + j] = s;
+        for (int l = 0; l < k; ++l) {
+            real ail = a[i * k + l];
+            const real* brow = &b[l * n];
+            real* crow = &c[i * n];
+            for (int j = 0; j < n; ++j) crow[j] += ail * brow[j];
         }
     TensorNode *Ap = A.node.get(), *Bp = B.node.get(), *Op = out.node.get();
     out.node->backward_fn = [Ap, Bp, Op, m, k, n] {
@@ -122,11 +126,12 @@ inline Tensor matmul(const Tensor& A, const Tensor& B) {
                 for (int j = 0; j < n; ++j) s += dc[i * n + j] * b[l * n + j];
                 da[i * k + l] += s;
             }
-        for (int l = 0; l < k; ++l)                  // dB = A^T @ dC
-            for (int j = 0; j < n; ++j) {
-                real s = 0;
-                for (int i = 0; i < m; ++i) s += a[i * k + l] * dc[i * n + j];
-                db[l * n + j] += s;
+        for (int i = 0; i < m; ++i)                  // dB = A^T @ dC, i-l-j (contiguous inner)
+            for (int l = 0; l < k; ++l) {
+                real ail = a[i * k + l];
+                const real* dcrow = &dc[i * n];
+                real* dbrow = &db[l * n];
+                for (int j = 0; j < n; ++j) dbrow[j] += ail * dcrow[j];
             }
     };
     return out;
