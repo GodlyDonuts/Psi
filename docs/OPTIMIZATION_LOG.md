@@ -21,6 +21,17 @@ so this number is the scoreboard.
   correctness is still gated tightly. A 200-step run drops 7.3s → 5.1s (**~1.4×**) at equivalent loss
   (~1.83). All grad-checks still PASS.
 
-_Next candidates: register/cache blocking (4×4 micro-kernel); arena/tape autograd to cut per-op
-allocation in psi-nano; persistent thread pool (parallelize medium matmuls without per-call spawn);
-Apple Accelerate/Metal as a roofline reference; then Step 3 — real Metal GPU kernels._
+**Iter 4 — `k`-unroll-by-4 register blocking (matmul forward): REVERTED.** Same-session A/B: 256³
+25.8 → 21.1 GFLOP/s, 512³ 22.6 → 18.0 — a ~15–20% **regression**. Grad-checks passed (correctness was
+fine), but it's slower: the compiler already auto-vectorizes the simple AXPY well, and manual unrolling
+added register/cache pressure. Reverted per the rule — *no measured win → revert*.
+
+⚠️ **Benchmark variance:** absolute GFLOP/s drift ~2× with machine load (the iter-2 "10.95" was under
+load; the quiet-machine baseline for the same code is ~22–26). Only **same-session A/B** numbers are
+trustworthy; the relative speedups in the table were same-session and stand.
+
+**Status:** the simple vectorized matmul is at the practical CPU double-precision roofline (~22–26
+GFLOP/s on 4 cores) — further matmul micro-opt shows diminishing/negative returns. Remaining clean CPU
+wins live in **per-op overhead** (arena/tape autograd for psi-nano's many small ops) and a **persistent
+thread pool**; the real 10–100× is **Step 3 — Metal GPU kernels** (best done with the user awake). Next
+iteration targets the arena/tape autograd.
