@@ -39,5 +39,16 @@ thread pool**; the real 10–100× is **Step 3 — Metal GPU kernels** (best don
 (200 steps): 3.6s/3.5s → 1.8s/1.7s with **identical loss (1.8250)** — convergence unchanged, no NaN.
 The grad-check oracle stays strict `double` (no fast-math), so the math remains proven; fast-math only
 relaxes FP reassociation/contraction on the training path, which is safe here (causal mask is −1e9 not
-−Inf, softmax is max-subtracted, CE is guarded). Next: arena/tape autograd, or batch the projection
-matmuls so they cross the threading threshold.
+−Inf, softmax is max-subtracted, CE is guarded).
+
+**Iter 6 — batch the projection matmuls (pack the batch into one `[B·T, d]` stream + block-diagonal
+causal mask): correct but NEUTRAL, REVERTED.** The batched forward is *bit-identical* to per-sequence
+(equivalence test: `0.00e+00`), but same-session A/B showed no speedup (1.8s → 1.8s): packing into one
+`[256,256]` attention computes ~8× the cross-sequence score pairs (then masks them), cancelling the
+gain from parallelizing the larger projection matmuls. Reverted.
+
+**Key finding:** psi-nano's bottleneck is **not** matmul size — neither bigger matmuls (iter 6) nor
+matmul micro-opt (iter 4) move its step time, while `-ffast-math` (iter 5) did. So the remaining cost
+is **per-op / scalar overhead** (node allocation, graph build, the many small elementwise loops), not
+GEMM. Next: profile to confirm, then **arena/tape autograd** to cut per-op allocation. The big leap
+remains **Step 3 — Metal GPU kernels** (with the user).
