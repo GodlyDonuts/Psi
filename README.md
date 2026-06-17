@@ -72,3 +72,8 @@ clang++ -std=c++17 -O2 src/step2_psi_nano/gradcheck.cpp -o step2_gradcheck && ./
 # train psi-nano on a small corpus (CPU, a few minutes) and sample text:
 clang++ -std=c++17 -O2 src/step2_psi_nano/main.cpp -o psi_nano && ./psi_nano   # optional: ./psi_nano <steps>
 ```
+
+_Result (MacBook CPU, ~3 min / 2500 steps): cross-entropy loss `ln(27) ≈ 3.30 → ~0.16`; generated
+text goes from noise to fluent corpus English, e.g._
+
+> "the model is built from scratch with a custom autograd engine. every operation knows how to compute its own gradient."
