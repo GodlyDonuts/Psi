@@ -31,7 +31,13 @@
 
 namespace psi {
 
-using real = double;  // reference-oracle precision; kernels go low-bit later.
+// `real` is the scalar type. Default `double` for the grad-check oracle (tight finite-diff);
+// build the training path with `-DPSI_REAL=float` for ~2× bandwidth/SIMD width. Kernels go lower
+// (bf16/fp8/ternary) later — this is just the CPU dtype knob.
+#ifndef PSI_REAL
+#define PSI_REAL double
+#endif
+using real = PSI_REAL;
 
 struct TensorNode {
     std::vector<int>  shape;                              // row-major

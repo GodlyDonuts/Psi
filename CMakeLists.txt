@@ -21,6 +21,7 @@ add_executable(step1 src/step1_tensor_autograd/main.cpp)
 # Step 2 — psi-nano: a tiny char-level GPT on the custom stack.
 add_executable(step2_gradcheck src/step2_psi_nano/gradcheck.cpp)  # transformer-op grad checks
 add_executable(psi_nano        src/step2_psi_nano/main.cpp)        # train + sample
+target_compile_definitions(psi_nano PRIVATE PSI_REAL=float)        # training path runs float32
 
 # Benchmarks — the optimization scoreboard.
 add_executable(matmul_bench src/bench/matmul_bench.cpp)
