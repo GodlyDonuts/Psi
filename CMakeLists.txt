@@ -9,7 +9,8 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-add_compile_options(-O3 -march=native -Wall -Wextra)
+add_compile_options(-O3 -march=native -Wall -Wextra -pthread)
+add_link_options(-pthread)
 
 # Step 0 — scalar reverse-mode autograd + XOR MLP + finite-difference grad check.
 add_executable(step0 src/step0_scalar_autograd/main.cpp)

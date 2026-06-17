@@ -25,6 +25,7 @@
 #include <functional>
 #include <memory>
 #include <random>
+#include <thread>
 #include <unordered_set>
 #include <vector>
 
@@ -95,6 +96,28 @@ inline Tensor make_out(std::vector<int> shape, const char* op, std::vector<NodeP
     return t;
 }
 
+// Split a row range [0,rows) across CPU threads when the work is large enough to amortize
+// thread spawn (small matmuls — e.g. psi-nano's — stay serial). f(r0,r1) must write only rows
+// in [r0,r1), so partitions are race-free and the result is identical to the serial version.
+inline int psi_threads() {
+    static int n = [] { unsigned h = std::thread::hardware_concurrency(); return h ? (int)h : 1; }();
+    return n;
+}
+template <class F>
+inline void parallel_rows(int rows, long work, F f) {
+    int T = psi_threads();
+    if (T <= 1 || rows < 2 || work < (1L << 20)) { f(0, rows); return; }  // serial for small work
+    T = std::min(T, rows);
+    int chunk = (rows + T - 1) / T;
+    std::vector<std::thread> pool;
+    for (int t = 0; t < T; ++t) {
+        int b = t * chunk, e = std::min(rows, (t + 1) * chunk);
+        if (b >= e) break;
+        pool.emplace_back([&f, b, e] { f(b, e); });
+    }
+    for (auto& th : pool) th.join();
+}
+
 // ---------------------------------------------------------------------------
 // Ops. Each computes the forward, then records the local backward.
 // ---------------------------------------------------------------------------
@@ -106,33 +129,43 @@ inline Tensor matmul(const Tensor& A, const Tensor& B) {
     assert(B.dim(0) == k);
     Tensor out = make_out({m, n}, "matmul", {A.node, B.node});
     const auto& a = A.data(); const auto& b = B.data(); auto& c = out.data();
-    // i-l-j order: the inner loop is contiguous in both b and c (c starts zero-filled),
-    // which is cache-friendly and auto-vectorizes — vs the naive i-j-l dot product that
-    // strides through b. Same result up to FP summation order (absorbed by grad-check tol).
-    for (int i = 0; i < m; ++i)
-        for (int l = 0; l < k; ++l) {
-            real ail = a[i * k + l];
-            const real* brow = &b[l * n];
-            real* crow = &c[i * n];
-            for (int j = 0; j < n; ++j) crow[j] += ail * brow[j];
-        }
+    long work = (long)m * k * n;
+    // forward: i-l-j (contiguous inner -> vectorizes), parallel over disjoint output rows i.
+    parallel_rows(m, work, [&](int i0, int i1) {
+        for (int i = i0; i < i1; ++i)
+            for (int l = 0; l < k; ++l) {
+                real ail = a[i * k + l];
+                const real* brow = &b[l * n];
+                real* crow = &c[i * n];
+                for (int j = 0; j < n; ++j) crow[j] += ail * brow[j];
+            }
+    });
     TensorNode *Ap = A.node.get(), *Bp = B.node.get(), *Op = out.node.get();
     out.node->backward_fn = [Ap, Bp, Op, m, k, n] {
         const auto& dc = Op->grad; const auto& a = Ap->data; const auto& b = Bp->data;
         auto& da = Ap->grad; auto& db = Bp->grad;
-        for (int i = 0; i < m; ++i)                  // dA = dC @ B^T
-            for (int l = 0; l < k; ++l) {
-                real s = 0;
-                for (int j = 0; j < n; ++j) s += dc[i * n + j] * b[l * n + j];
-                da[i * k + l] += s;
-            }
-        for (int i = 0; i < m; ++i)                  // dB = A^T @ dC, i-l-j (contiguous inner)
-            for (int l = 0; l < k; ++l) {
-                real ail = a[i * k + l];
-                const real* dcrow = &dc[i * n];
-                real* dbrow = &db[l * n];
-                for (int j = 0; j < n; ++j) dbrow[j] += ail * dcrow[j];
-            }
+        long work = (long)m * k * n;
+        // dA = dC @ B^T, parallel over disjoint rows i of dA.
+        parallel_rows(m, work, [&](int i0, int i1) {
+            for (int i = i0; i < i1; ++i)
+                for (int l = 0; l < k; ++l) {
+                    real s = 0;
+                    const real* dcrow = &dc[i * n];
+                    const real* brow = &b[l * n];
+                    for (int j = 0; j < n; ++j) s += dcrow[j] * brow[j];
+                    da[i * k + l] += s;
+                }
+        });
+        // dB = A^T @ dC, l-outer so threads own disjoint rows l of dB (contiguous inner j).
+        parallel_rows(k, work, [&](int l0, int l1) {
+            for (int l = l0; l < l1; ++l)
+                for (int i = 0; i < m; ++i) {
+                    real ail = a[i * k + l];
+                    const real* dcrow = &dc[i * n];
+                    real* dbrow = &db[l * n];
+                    for (int j = 0; j < n; ++j) dbrow[j] += ail * dcrow[j];
+                }
+        });
     };
     return out;
 }

@@ -12,6 +12,12 @@ so this number is the scoreboard.
 |---|---|---:|---:|---|
 | 0 | baseline — naive `i-j-l` matmul, `-O2` | 1.80 | 1.0× | ✅ PASS |
 | 1 | `i-l-j` loop reorder (contiguous inner loop → cache-friendly + vectorizable) + `-O3 -march=native` | 5.40 | **3.0×** | ✅ PASS |
+| 2 | multithread matmul over disjoint output rows (4 perf cores; large matmuls only) | 10.95 (256³) / 14.24 (512³) | **6.1× / 7.9×** | ✅ PASS |
 
-_Next candidates: multithread matmul over output rows (≈4 perf cores); register/cache blocking;
-float32 path for the training loop; arena/tape autograd to cut allocation overhead._
+**psi-nano (the real workload):** step-100 wall-time 5.9s → 2.6s after iters 1–2 (**2.3× faster**); its
+matmuls are below the threading threshold so they stay serial (no regression), and the loss is
+bit-identical (2.1949) — numerical determinism preserved.
+
+_Next candidates: register/cache blocking (e.g. 4×4 micro-kernel); float32 training path (≈2×
+bandwidth); arena/tape autograd to cut per-op allocation in psi-nano; persistent thread pool (avoid
+per-call spawn)._
