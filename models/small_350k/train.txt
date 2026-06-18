@@ -1,1 +1,7 @@
 fitting BPE (vocab=512) ...
+psi-stories | vocab=512 d=96 layers=6(uniq=3) heads=4/kv2 ctx=64 hid=256(SwiGLU) RoPE  tokens=7966124 (2.82 c/tok)  train=7169512 val=796612  params=353952
+step     0   train 6.2613   val 6.2558   (0.5s)
+step   100   train 5.5958   val 0.0000   (25.9s)
+step   200   train 4.3058   val 0.0000   (51.7s)
+step   300   train 3.8427   val 0.0000   (78.4s)
+step   400   train 3.6816   val 0.0000   (106.3s)
