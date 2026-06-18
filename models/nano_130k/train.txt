@@ -1,0 +1,50 @@
+fitting BPE (vocab=512) ...
+psi-stories | vocab=512 d=64 layers=4(uniq=2) heads=4/kv2 ctx=64 hid=192(SwiGLU) RoPE  tokens=7966124 (2.82 c/tok)  train=7169512 val=796612  params=131392
+step     0   train 6.2505   val 6.2537   (0.2s)
+step   100   train 5.6242   val 0.0000   (5.6s)
+step   200   train 4.5420   val 0.0000   (11.3s)
+step   300   train 4.2762   val 0.0000   (17.1s)
+step   400   train 4.0159   val 0.0000   (23.0s)
+step   500   train 3.9036   val 0.0000   (28.9s)
+step   600   train 3.5823   val 0.0000   (34.5s)
+step   700   train 3.5886   val 0.0000   (40.5s)
+step   800   train 3.4094   val 0.0000   (46.3s)
+step   900   train 3.2018   val 0.0000   (52.1s)
+step  1000   train 3.0128   val 3.4316   (57.7s)
+step  1100   train 3.1754   val 0.0000   (63.3s)
+step  1200   train 3.2388   val 0.0000   (69.1s)
+step  1300   train 3.0680   val 0.0000   (74.8s)
+step  1400   train 3.3290   val 0.0000   (80.5s)
+step  1500   train 3.0802   val 0.0000   (86.5s)
+step  1600   train 2.9566   val 0.0000   (92.5s)
+step  1700   train 3.0960   val 0.0000   (98.4s)
+step  1800   train 2.9976   val 0.0000   (104.3s)
+step  1900   train 2.8983   val 0.0000   (110.3s)
+step  2000   train 3.1296   val 3.1017   (116.1s)
+step  2100   train 2.7936   val 0.0000   (121.6s)
+step  2200   train 2.9563   val 0.0000   (127.3s)
+step  2300   train 2.7263   val 0.0000   (132.8s)
+step  2400   train 2.7852   val 0.0000   (138.2s)
+step  2500   train 2.7232   val 0.0000   (143.7s)
+step  2600   train 2.9613   val 0.0000   (149.1s)
+step  2700   train 2.7888   val 0.0000   (154.6s)
+step  2800   train 2.9543   val 0.0000   (160.1s)
+step  2900   train 2.8328   val 0.0000   (165.5s)
+step  3000   train 2.5972   val 2.9612   (171.1s)
+step  3100   train 2.9138   val 0.0000   (176.5s)
+step  3200   train 2.6382   val 0.0000   (182.1s)
+step  3300   train 2.5509   val 0.0000   (187.4s)
+step  3400   train 2.6185   val 0.0000   (192.9s)
+step  3500   train 2.8885   val 0.0000   (198.6s)
+step  3600   train 2.7539   val 0.0000   (204.2s)
+step  3700   train 2.2788   val 0.0000   (209.8s)
+step  3800   train 2.4743   val 0.0000   (215.4s)
+step  3900   train 2.3935   val 0.0000   (221.0s)
+step  4000   train 2.6954   val 2.7718   (226.7s)
+saved -> psi_stories.bin
+
+sample:
+  Once upon a time incirp. Now, you have sound" he said. They say sorry, "Can I do you don't know. Some," he asked. He gave thinly they were done. She was very happy. She caught it started to run away. He did not like to try. She remembered anymore. He thought it was a paper in the yard. He tried to seat the piece of the station. Mom said, "What is big, yield Sally," he said.
+Lily wanted to be friends in the park.
+But the old bird, the tabletge hungry, but he could not find the picture. These had an idea and laughed.
+They thought the noise quickly and kept playnyhinued to the bird. The dog
