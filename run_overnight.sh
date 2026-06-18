@@ -1,22 +1,20 @@
 #!/usr/bin/env bash
-# run_overnight.sh — psi-stories sub-1M capability-per-bit campaign.
+# run_overnight.sh — psi-stories sub-1M capability-per-bit campaign (modern architecture).
 #
-# Trains the flagship sub-1M model + a size sweep + a multi-head ablation on TinyStories, evaluates
-# each against the bar, and writes a SELF-CONTAINED, REPRODUCIBLE folder per model under models/<name>/:
-#   MODEL.md  (config + exact reproduce command + git commit + final loss + grade)
-#   train.txt (full training curve)   eval.txt (completions on the bar prompts)   model.bin (checkpoint)
+# Every model uses the full stack from docs/RESEARCH.md: small-BPE · multi-head + GQA · RoPE · SwiGLU ·
+# block-wise weight-sharing (deep-and-thin) · tied embeddings · WSD LR schedule. Trains a frontier sweep
+# on TinyStories, evals each against the bar, and writes a SELF-CONTAINED REPRODUCIBLE folder per model:
+#   models/<name>/  =  MODEL.md (config + exact reproduce cmd + git commit + grade) · train.txt · eval.txt · model.bin
 # Built to run UNATTENDED overnight. Launch when the Mac is free:   bash run_overnight.sh
-#
-# Priority order: most important runs first, so a partial night still yields the key results.
+# Priority order: flagship first (guaranteed headline), then shrink — a partial night still yields results.
 
 cd "$(dirname "$0")"
 TS=$(date +%Y%m%d_%H%M%S)
 mkdir -p results
-exec > >(tee "results/overnight_$TS.log") 2>&1     # live campaign log (gitignored)
+exec > >(tee "results/overnight_$TS.log") 2>&1
 GITCOMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
 echo "=== psi-stories sub-1M campaign  $TS  (code git $GITCOMMIT) ==="
 
-# --- data: a ~100 MB slice of the full TinyStories train set (better than the 21MB valid slice) ---
 DATA="data/tinystories-train-100mb.txt"
 if [ ! -s "$DATA" ]; then
   echo "downloading ~100MB train slice ..."
@@ -31,13 +29,13 @@ clang++ -std=c++17 -O3 -march=native -ffast-math -DPSI_REAL=float \
   src/step2_psi_nano/stories.cpp src/step3_metal/metal_backend.mm \
   -framework Metal -framework Foundation -o psi_stories || { echo "BUILD FAILED"; exit 1; }
 
-run() { # name steps vocab d layers block hidden heads
-  local name=$1 steps=$2 vocab=$3 d=$4 layers=$5 block=$6 hidden=$7 heads=$8
+run() { # name steps vocab d layers block hidden heads nkv nuniq
+  local name=$1 steps=$2 vocab=$3 d=$4 layers=$5 block=$6 hidden=$7 heads=$8 nkv=$9 nuniq=${10}
   local dir="models/$name"
   mkdir -p "$dir"
-  local cmd="./psi_stories train $DATA $steps $vocab $d $layers $block $hidden $heads"
+  local cmd="./psi_stories train $DATA $steps $vocab $d $layers $block $hidden $heads $nkv $nuniq"
   echo ""
-  echo "===== $name : steps=$steps vocab=$vocab d=$d L=$layers ctx=$block hid=$hidden heads=$heads  ($(date +%H:%M:%S)) ====="
+  echo "===== $name : $cmd   ($(date +%H:%M:%S)) ====="
   $cmd > "$dir/train.txt" 2>&1 || { echo "$name TRAIN FAILED (see $dir/train.txt)"; return; }
   cp psi_stories.bin "$dir/model.bin"
   ./psi_stories eval "$dir/model.bin" eval/tinystories_prompts.txt 0.7 > "$dir/eval.txt" 2>&1 || echo "$name EVAL FAILED"
@@ -55,8 +53,8 @@ TinyStories bar" search (see [docs/EVAL.md](../../docs/EVAL.md)).
 |---|---|
 | parameters | **$params** |
 | tokenizer | small BPE, vocab = $vocab |
-| architecture | d=$d · layers=$layers · heads=$heads · context=$block · hidden=$hidden · RMSNorm · tied embeddings |
-| training | $steps steps · AdamW (lr 1e-3, wd 0.01) · batch 8 |
+| architecture | d=$d · layers=$layers (uniq=$nuniq, block-shared) · heads=$heads / kv=$nkv (GQA) · ctx=$block · hidden=$hidden (SwiGLU) · RoPE · RMSNorm · tied emb |
+| training | $steps steps · AdamW (1e-3, wd 0.01) · **WSD** schedule · batch 8 |
 | data | TinyStories V2-GPT4 (~100 MB train slice) — see [data/README.md](../../data/README.md) |
 | code version | git \`$GITCOMMIT\` |
 | final loss | $last |
@@ -75,8 +73,8 @@ $cmd
 
 ## Files
 - \`train.txt\` — full training curve (train + held-out val loss)
-- \`eval.txt\` — the model's completions on the capability-bar prompts (\`eval/tinystories_prompts.txt\`)
-- \`model.bin\` — trained checkpoint (not committed — large binary; regenerate via Reproduce above)
+- \`eval.txt\` — completions on the capability-bar prompts (\`eval/tinystories_prompts.txt\`)
+- \`model.bin\` — trained checkpoint (not committed; regenerate via Reproduce)
 
 ## Capability-bar grade (docs/EVAL.md rubric, graded by Claude)
 _Filled in after the run:_  Grammar — · Coherence — · Consistency — · Plot — · **clears bar? —**
@@ -84,15 +82,12 @@ EOF
   echo "$name | params=$params | $last"
 }
 
-# 1) flagship sub-1M (~965K) — the headline result
-run flagship_965k  15000  1024 128 5 128 384 4
-# 2) multi-head ablation at the same size (heads=1) — measures what multi-head bought us
-run ablate_1head   15000  1024 128 5 128 384 1
-# 3) size sweep downward — find where coherence breaks (the capability-per-bit frontier)
-run mid_600k       10000  1024 96  5 128 320 4
-run small_450k     10000  1024 96  4 96  256 4
-run tiny_250k      10000  512  64  4 96  192 4
-run nano_150k      10000  512  64  3 96  128 4
+#    name           steps  vocab  d  layers ctx hidden heads nkv nuniq   (≈params)
+run flagship_900k   15000  1024  128   8    128  384     4    2    4   #  ~918K — 8 deep / 4 shared
+run mid_570k        12000  1024  128   6    128  256     4    2    3   #  ~574K
+run small_350k      12000   512   96   6    128  256     4    2    3   #  ~354K
+run tiny_215k       10000   512   96   4    128  192     4    2    2   #  ~215K
+run nano_130k       10000   512   64   4    128  192     4    2    2   #  ~131K — how low can it still tell a story?
 
 echo ""
 echo "=== CAMPAIGN COMPLETE  $(date +%Y-%m-%d_%H:%M:%S) ===" | tee "models/CAMPAIGN_DONE_$TS"
