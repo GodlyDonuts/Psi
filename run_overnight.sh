@@ -15,7 +15,7 @@ exec > >(tee "results/overnight_$TS.log") 2>&1
 GITCOMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
 echo "=== psi-stories sub-1M campaign  $TS  (code git $GITCOMMIT) ==="
 
-DATA="data/tinystories-train-100mb.txt"
+DATA="data/tinystories-valid.txt"
 if [ ! -s "$DATA" ]; then
   echo "downloading ~100MB train slice ..."
   curl -sL -r 0-104857600 -o "$DATA" \
@@ -88,11 +88,15 @@ EOF
 # next phase is a longer run on the most promising config.
 # ctx=64 (not 128): keeps peak RSS ~1GB on the 8GB Mac — ctx128 x 8-layer flagship hit ~1.8GB and got
 # jetsam-killed under real memory pressure. 64 tokens (~45 words) is enough for first-pass TinyStories.
-run flagship_900k   8000  1024  128   8    64   384     4    2    4   #  ~918K — 8 deep / 4 shared
-run mid_570k        8000  1024  128   6    64   256     4    2    3   #  ~574K
-run small_350k      8000   512   96   6    64   256     4    2    3   #  ~354K
-run tiny_215k       8000   512   96   4    64   192     4    2    2   #  ~215K
-run nano_130k       8000   512   64   4    64   192     4    2    2   #  ~131K — how low can it still tell a story?
+# SMALLEST-FIRST: the small models are the goal ("how small can it still tell a story?") and use the
+# least memory, so they complete first even if the bigger ones get squeezed on the 8GB Mac.
+# Steps tuned to the 8GB memory ceiling (~0.4MB/step residual growth + ~1.8GB baseline): small models
+# fit more steps and are the goal, so they get the most training. continue-on-failure handles any OOM.
+run nano_130k       4000   512   64   4    64   192     4    2    2   #  ~131K — how low can it still tell a story?
+run tiny_215k       4000   512   96   4    64   192     4    2    2   #  ~215K
+run small_350k      3000   512   96   6    64   256     4    2    3   #  ~354K
+run mid_570k        2500  1024  128   6    64   256     4    2    3   #  ~574K
+run flagship_900k   2000  1024  128   8    64   384     4    2    4   #  ~918K — 8 deep / 4 shared (biggest)
 
 echo ""
 echo "=== CAMPAIGN COMPLETE  $(date +%Y-%m-%d_%H:%M:%S) ===" | tee "models/CAMPAIGN_DONE_$TS"

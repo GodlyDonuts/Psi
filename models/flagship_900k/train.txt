@@ -1,4 +1,4 @@
 fitting BPE (vocab=1024) ...
-psi-stories | vocab=1024 d=128 layers=8(uniq=4) heads=4/kv2 ctx=128 hid=384(SwiGLU) RoPE  tokens=30497816 (3.44 c/tok)  train=27448035 val=3049781  params=918656
-step     0   train 6.9353   val 6.9599   (2.4s)
-step   100   train 6.1138   val 6.0760   (94.6s)
+psi-stories | vocab=1024 d=128 layers=8(uniq=4) heads=4/kv2 ctx=64 hid=384(SwiGLU) RoPE  tokens=30497816 (3.44 c/tok)  train=27448035 val=3049781  params=918656
+step     0   train 6.9377   val 6.9618   (1.4s)
+step   100   train 6.1374   val 6.1066   (59.7s)
