@@ -83,11 +83,14 @@ EOF
 }
 
 #    name           steps  vocab  d  layers ctx hidden heads nkv nuniq   (≈params)
-run flagship_900k   15000  1024  128   8    128  384     4    2    4   #  ~918K — 8 deep / 4 shared
-run mid_570k        12000  1024  128   6    128  256     4    2    3   #  ~574K
-run small_350k      12000   512   96   6    128  256     4    2    3   #  ~354K
-run tiny_215k       10000   512   96   4    128  192     4    2    2   #  ~215K
-run nano_130k       10000   512   64   4    128  192     4    2    2   #  ~131K — how low can it still tell a story?
+# First-pass frontier: 8000 steps each so all 5 finish overnight (~6.5h). Models are undertrained vs the
+# small-model scaling law (D/N≈192) — this maps the rough frontier + validates the stack; the morning's
+# next phase is a longer run on the most promising config.
+run flagship_900k   8000  1024  128   8    128  384     4    2    4   #  ~918K — 8 deep / 4 shared
+run mid_570k        8000  1024  128   6    128  256     4    2    3   #  ~574K
+run small_350k      8000   512   96   6    128  256     4    2    3   #  ~354K
+run tiny_215k       8000   512   96   4    128  192     4    2    2   #  ~215K
+run nano_130k       8000   512   64   4    128  192     4    2    2   #  ~131K — how low can it still tell a story?
 
 echo ""
 echo "=== CAMPAIGN COMPLETE  $(date +%Y-%m-%d_%H:%M:%S) ===" | tee "models/CAMPAIGN_DONE_$TS"
