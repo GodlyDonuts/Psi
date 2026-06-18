@@ -90,13 +90,12 @@ EOF
 # jetsam-killed under real memory pressure. 64 tokens (~45 words) is enough for first-pass TinyStories.
 # SMALLEST-FIRST: the small models are the goal ("how small can it still tell a story?") and use the
 # least memory, so they complete first even if the bigger ones get squeezed on the 8GB Mac.
-# Steps tuned to the 8GB memory ceiling (~0.4MB/step residual growth + ~1.8GB baseline): small models
-# fit more steps and are the goal, so they get the most training. continue-on-failure handles any OOM.
-run nano_130k       4000   512   64   4    64   192     4    2    2   #  ~131K — how low can it still tell a story?
-run tiny_215k       4000   512   96   4    64   192     4    2    2   #  ~215K
-run small_350k      3000   512   96   6    64   256     4    2    3   #  ~354K
-run mid_570k        2500  1024  128   6    64   256     4    2    3   #  ~574K
-run flagship_900k   2000  1024  128   8    64   384     4    2    4   #  ~918K — 8 deep / 4 shared (biggest)
+# nano_130k already done (4000 steps, committed). Per-step leak scales with model size, so bigger configs
+# fit fewer steps before the 8GB ceiling — step counts set to COMPLETE (undertrained but gradeable).
+run tiny_215k        900   512   96   4    64   192     4    2    2   #  ~215K
+run small_350k       700   512   96   6    64   256     4    2    3   #  ~354K
+run mid_570k         500  1024  128   6    64   256     4    2    3   #  ~574K
+run flagship_900k    400  1024  128   8    64   384     4    2    4   #  ~918K — 8 deep / 4 shared (biggest)
 
 echo ""
 echo "=== CAMPAIGN COMPLETE  $(date +%Y-%m-%d_%H:%M:%S) ===" | tee "models/CAMPAIGN_DONE_$TS"
