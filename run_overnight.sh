@@ -76,7 +76,7 @@ $cmd
 - \`eval.txt\` — completions on the capability-bar prompts (\`eval/tinystories_prompts.txt\`)
 - \`model.bin\` — trained checkpoint (not committed; regenerate via Reproduce)
 
-## Capability-bar grade (docs/EVAL.md rubric, graded by Claude)
+## Capability-bar grade (docs/EVAL.md rubric, graded by a strong LLM)
 _Filled in after the run:_  Grammar — · Coherence — · Consistency — · Plot — · **clears bar? —**
 EOF
   echo "$name | params=$params | $last"

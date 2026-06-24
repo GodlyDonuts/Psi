@@ -30,10 +30,10 @@ clang++ -std=c++17 -O3 -march=native -ffast-math -DPSI_REAL=float \
 - `eval.txt` — completions on the capability-bar prompts (`eval/tinystories_prompts.txt`)
 - `model.bin` — trained checkpoint (not committed; regenerate via Reproduce)
 
-## Capability-bar grade (docs/EVAL.md rubric, graded by Claude)
+## Capability-bar grade (docs/EVAL.md rubric, graded by a strong LLM)
 Grammar **5** · Coherence **3** · Consistency **2** · Plot **2** · **clears bar? ❌ No**
 
-_Graded by Claude (Opus 4.8). Remarkably TinyStories-flavored for 131K params + only 4000 steps (~4M
+_Graded by a strong LLM. Remarkably TinyStories-flavored for 131K params + only 4000 steps (~4M
 tokens, final loss 2.70): grammatical English with dialogue, named characters, the right vocabulary and
 register ("Once upon a time", happy/sad/friends, `<|endoftext|>`). But it drifts — switches characters
 mid-story, ignores the prompt's setup, no coherent arc. **Undertrained**: TinyStories coherence needs
